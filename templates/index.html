@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EcoShield AI - Environmental Monitoring</title>
+  <link rel="icon" href="/static/images/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<button id="menu-toggle" class="menu-toggle" aria-label="Open navigation">&#9776;</button>
+
+<aside class="sidebar" id="sidebar">
+  <div class="brand"><img src="/static/images/logo.svg" alt="" width="36" height="36"><div><strong>EcoShield AI</strong><small>Environmental monitoring</small></div></div>
+  <nav>
+    <button class="nav-btn active" data-section="overview">&#9635; Overview Dashboard</button>
+    <button class="nav-btn" data-section="forest">&#127795; Forest Monitoring</button>
+    <button class="nav-btn" data-section="fire">&#128293; Fire Monitoring</button>
+    <button class="nav-btn" data-section="claims">&#9989; Climate Claim Checker</button>
+    <button class="nav-btn" data-section="reports">&#128196; Environmental Reports</button>
+    <button class="nav-btn" data-section="about">&#8505; About EcoShield AI</button>
+  </nav>
+  <p class="side-note">Prototype for learning. Results are indicative, not scientific proof.</p>
+</aside>
+
+<main>
+<!-- ============ OVERVIEW ============ -->
+<section id="section-overview" class="view active">
+  <header class="page-head"><div><h1>Overview Dashboard</h1><p>Summary of all monitoring activity.</p></div>
+    <div class="toolbar">
+      <label>Period <select id="days-filter"><option value="0">All time</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option><option value="180">Last 180 days</option><option value="365">Last 365 days</option></select></label>
+      <button class="btn" id="btn-refresh-dashboard">Refresh</button>
+    </div></header>
+  <div id="dash-mode" class="banner" hidden></div>
+  <div class="stats">
+    <div class="card stat"><span>Forest monitoring records</span><strong id="stat-forest">-</strong></div>
+    <div class="card stat"><span>Potential forest-cover changes</span><strong id="stat-changes">-</strong><small>pixel difference of 5% or more</small></div>
+    <div class="card stat"><span>Recorded fire hotspots</span><strong id="stat-fire">-</strong></div>
+    <div class="card stat"><span>Claims analyzed</span><strong id="stat-claims">-</strong></div>
+  </div>
+  <div class="grid-3">
+    <div class="card"><h3>Forest monitoring activity</h3><div class="chart-box"><canvas id="chart-forest-activity"></canvas><p class="chart-fallback" hidden>Charts unavailable: Chart.js could not be loaded (check your internet connection).</p></div></div>
+    <div class="card"><h3>Fire hotspots by alert category</h3><div class="chart-box"><canvas id="chart-fire-dist"></canvas><p class="chart-fallback" hidden>Charts unavailable: Chart.js could not be loaded (check your internet connection).</p></div></div>
+    <div class="card"><h3>Claim-checking results</h3><div class="chart-box"><canvas id="chart-claims"></canvas><p class="chart-fallback" hidden>Charts unavailable: Chart.js could not be loaded (check your internet connection).</p></div></div>
+  </div>
+  <div class="grid-2">
+    <div class="card"><h3>Recent environmental alerts</h3><ul id="alerts-list" class="feed"></ul></div>
+    <div class="card"><h3>Recent activity</h3><ul id="activity-list" class="feed"></ul></div>
+  </div>
+</section>
+
+<!-- ============ FOREST ============ -->
+<section id="section-forest" class="view">
+  <header class="page-head"><div><h1>Forest Monitoring</h1><p>Compare two forest images taken on different dates.</p></div></header>
+  <div class="banner warn"><strong>Basic image comparison only.</strong> This module compares pixels and does not yet provide validated satellite-based forest classification. Clouds, shadows, lighting and camera angle affect results, and a difference does not prove deforestation or illegal logging.</div>
+  <div class="card">
+    <form id="forest-form" novalidate>
+      <div class="form-grid">
+        <label>Location name<input name="location" maxlength="100" required placeholder="e.g. Bandipur buffer zone"></label>
+        <label>Date of earlier image<input type="date" name="date_before" required></label>
+        <label>Date of later image<input type="date" name="date_after" required></label>
+      </div>
+      <div class="form-grid two">
+        <label>Earlier image (PNG, JPG, WEBP)<input type="file" name="before_image" id="file-before" accept=".png,.jpg,.jpeg,.webp" required><img id="preview-before" class="preview" alt="Preview of earlier image" hidden></label>
+        <label>Later image (PNG, JPG, WEBP)<input type="file" name="after_image" id="file-after" accept=".png,.jpg,.jpeg,.webp" required><img id="preview-after" class="preview" alt="Preview of later image" hidden></label>
+      </div>
+      <button class="btn primary" type="submit" id="forest-submit">Compare images</button>
+      <span id="forest-status" class="status"></span>
+    </form>
+  </div>
+  <div id="forest-result"></div>
+  <div class="card"><h3>Saved forest analyses</h3>
+    <div class="table-wrap"><table><thead><tr><th>Location</th><th>Image dates</th><th>Changed pixels</th><th>Level</th><th>Analysed</th><th></th></tr></thead><tbody id="forest-history"></tbody></table></div></div>
+</section>
+
+<!-- ============ FIRE ============ -->
+<section id="section-fire" class="view">
+  <header class="page-head"><div><h1>Fire Monitoring</h1><p>Observed fire hotspots from satellite detections.</p></div>
+    <div class="toolbar"><button class="btn" id="fire-refresh">Refresh data</button></div></header>
+  <div id="fire-mode" class="banner" hidden></div>
+  <div class="card">
+    <form id="fire-filters" class="filters">
+      <label>Location<input name="location" placeholder="e.g. Karnataka"></label>
+      <label>From<input type="date" name="date_from"></label>
+      <label>To<input type="date" name="date_to"></label>
+      <label>Alert category<select name="category"><option value="">All</option><option>High</option><option>Medium</option><option>Low</option></select></label>
+      <button class="btn primary" type="submit">Apply</button>
+      <button class="btn" type="button" id="fire-reset">Reset</button>
+    </form>
+    <p id="fire-count" class="muted"></p>
+  </div>
+  <div class="grid-map">
+    <div class="card"><div id="fire-map" class="map"></div></div>
+    <div class="card"><h3>Hotspot details</h3><div id="fire-detail" class="muted">Select a hotspot on the map or in the list.</div></div>
+  </div>
+  <div class="grid-2">
+    <div class="card"><h3>Hotspots per month</h3><div class="chart-box"><canvas id="chart-fire-month"></canvas><p class="chart-fallback" hidden>Charts unavailable: Chart.js could not be loaded.</p></div></div>
+    <div class="card"><h3>Hotspots by alert category</h3><div class="chart-box"><canvas id="chart-fire-cat"></canvas><p class="chart-fallback" hidden>Charts unavailable: Chart.js could not be loaded.</p></div></div>
+  </div>
+  <div class="card"><h3>Hotspot records</h3>
+    <div class="table-wrap tall"><table><thead><tr><th>ID</th><th>Date</th><th>Location</th><th>Lat, Lon</th><th>Confidence</th><th>Alert</th></tr></thead><tbody id="fire-list"></tbody></table></div></div>
+</section>
+
+<!-- ============ CLAIMS ============ -->
+<section id="section-claims" class="view">
+  <header class="page-head"><div><h1>Climate Claim Checker</h1><p>Compare a claim with a small set of trusted references.</p></div></header>
+  <div class="banner">This tool uses <strong>basic evidence matching</strong> (keyword similarity against a small reference collection). It is not a trained AI model, and "Unverified" simply means no matching evidence was found.</div>
+  <div class="card">
+    <form id="claim-form" novalidate>
+      <label>Claim<textarea name="claim" rows="3" maxlength="500" required placeholder="e.g. Planting trees alone can fully solve climate change"></textarea></label>
+      <div class="filters">
+        <label>Category<select name="category"><option value="deforestation">Deforestation</option><option value="climate_change">Climate change</option><option value="biodiversity">Biodiversity</option><option value="forest_fires">Forest fires</option></select></label>
+        <button class="btn primary" type="submit">Check claim</button><span id="claim-status" class="status"></span>
+      </div>
+    </form>
+  </div>
+  <div id="claim-result"></div>
+  <div class="card"><h3>Claim history</h3><div id="claim-history"></div></div>
+</section>
+
+<!-- ============ REPORTS ============ -->
+<section id="section-reports" class="view">
+  <header class="page-head"><div><h1>Environmental Reports</h1><p>Browse, filter and export saved records.</p></div></header>
+  <div class="card">
+    <form id="report-filters" class="filters">
+      <label>From<input type="date" name="date_from"></label>
+      <label>To<input type="date" name="date_to"></label>
+      <label>Claim category<select name="claim_category"><option value="">All</option><option value="deforestation">Deforestation</option><option value="climate_change">Climate change</option><option value="biodiversity">Biodiversity</option><option value="forest_fires">Forest fires</option></select></label>
+      <label>Fire alert level<select name="fire_level"><option value="">All</option><option>High</option><option>Medium</option><option>Low</option></select></label>
+      <button class="btn primary" type="submit">Apply filters</button>
+    </form>
+    <div class="exports"><span>Export:</span>
+      <a class="btn" id="export-forest" href="#">Forest CSV</a><a class="btn" id="export-fire" href="#">Fire CSV</a>
+      <a class="btn" id="export-claims" href="#">Claims CSV</a><a class="btn primary" id="export-pdf" href="#">PDF summary</a></div>
+    <p id="report-meta" class="muted"></p>
+  </div>
+  <div class="card"><h3>Forest comparisons</h3><div class="table-wrap"><table><thead><tr><th>ID</th><th>Location</th><th>Changed pixels</th><th>Analysed</th><th>Source</th></tr></thead><tbody id="report-forest"></tbody></table></div></div>
+  <div class="card"><h3>Fire hotspots</h3><div class="table-wrap tall"><table><thead><tr><th>ID</th><th>Date</th><th>Location</th><th>Alert</th><th>Source</th></tr></thead><tbody id="report-fire"></tbody></table></div></div>
+  <div class="card"><h3>Claim analyses</h3><div class="table-wrap"><table><thead><tr><th>ID</th><th>Claim</th><th>Result</th><th>Analysed</th></tr></thead><tbody id="report-claims"></tbody></table></div></div>
+</section>
+
+<!-- ============ ABOUT ============ -->
+<section id="section-about" class="view">
+  <header class="page-head"><div><h1>About EcoShield AI</h1><p>AI-Powered Environmental Protection and Monitoring System (SD-01)</p></div></header>
+  <div class="grid-2">
+    <div class="card"><h3>What it does</h3><p>EcoShield AI helps users compare forest images, explore observed fire hotspots, and check environmental claims against trusted references, all in one dashboard.</p>
+      <h3>Technology</h3><p>HTML, CSS and JavaScript frontend; Python Flask backend; SQLite storage; OpenCV and Pillow for images; Chart.js and Leaflet for charts and maps.</p></div>
+    <div class="card"><h3>Sample data vs live data</h3>
+      <ul class="plain"><li><strong>Fire hotspots:</strong> sample demonstration data unless a NASA FIRMS key is configured.</li><li><strong>Starter records:</strong> forest and claim records marked "Sample" are demonstration data.</li><li><strong>Your uploads and claim checks:</strong> real records created by you.</li></ul>
+      <h3>Limitations</h3><ul class="plain"><li>Pixel comparison is not validated forest classification and cannot prove illegal logging.</li><li>Hotspot observations do not predict future fires.</li><li>The claim checker is keyword matching against 12 reference entries, not a trained AI model.</li></ul></div>
+  </div>
+</section>
+</main>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<dialog id="detail-dialog"><div class="dialog-head"><h3 id="dialog-title"></h3><button class="btn" id="dialog-close">Close</button></div><div id="dialog-body"></div></dialog>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/static/js/script.js"></script>
+</body>
+</html>
